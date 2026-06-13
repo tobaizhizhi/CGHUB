@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "tsx --env-file=.env src/index.ts",
     "mcp": "tsx --env-file=.env src/mcp-server.ts",
-    "api": "tsx --env-file=.env src/http-server.ts"
+    "api": "tsx --env-file=.env src/http-server.ts",
+    "prepare:pacts": "tsx --env-file=.env src/prepare-pacts.ts",
+    "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@cobo/agentic-wallet": "^0.1.7",

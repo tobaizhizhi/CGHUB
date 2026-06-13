@@ -1,39 +1,32 @@
 /**
  * 入口：把各块串起来跑端到端，用于自测和 Demo 录屏（不依赖 MCP 客户端）。
  *
- * 全流程（前提：owner 已 createRound + fundRound；CAW 已 onboard 且 CAW_PACT_ID 配好）：
- *   1. sign   : agentSigner 链下签贡献 proof
- *   2. submit : CAW 钱包发 recordContributionBySig 上链
+ * 全流程（前提：owner 已 createRound + fundRound；CAW 已 onboard 且 Main/Sign Pact 配好）：
+ *   1. review : Agent 评分并过审批策略
+ *   2. record : Cobo Sign Pact 签 proof，CAW Main Pact 发 recordContributionBySig 上链
  *   3.（owner finalizeRound —— 不在本脚本，白织/手动）
- *   4. claim  : pending>0 → CAW 钱包调 claimFor 分账
+ *   4. claim  : pending>0 → CAW Main Pact 调 claimFor 分账
  */
 
-import { recordContribution } from './contribution-recorder.js';
-import { newPaymentId } from './x402-prover.js';
+import { newPaymentId } from './utils.js';
 import { WalletAgent } from './wallet-agent.js';
-import { submitContributionTool } from '../tools/submit-contribution.js';
-import type { ContributionInput } from './types.js';
+import { signContributionTool } from '../tools/sign-contribution.js';
 
 async function main() {
   const demoContributor = '0x00000000000000000000000000000000deadbeef'; // TODO 换成真实贡献者
 
-  // 1. 签贡献
-  const input: ContributionInput = {
+  // 1. 评分、审批、签名并上链
+  const rec = await signContributionTool.handler({
+    projectId: '1',
+    roundId: '1',
     contributor: demoContributor,
-    score: 50,
+    title: 'demo contribution',
+    description: 'demo contribution for CGHub agent flow',
     source: 'github',
     evidenceId: 'pr-123',
     paymentId: newPaymentId(),
-  };
-  const signed = await recordContribution(input);
-  console.log('[1] 已签名 proof：', signed.proof.proofHash);
-
-  // 2. CAW 钱包上链
-  const proofStr = Object.fromEntries(
-    Object.entries(signed.proof).map(([k, v]) => [k, typeof v === 'bigint' ? v.toString() : v]),
-  ) as Record<string, string>;
-  const rec = await submitContributionTool.handler({ proof: proofStr, signature: signed.signature });
-  console.log('[2] 上链：', rec);
+  });
+  console.log('[1] 评分审批与上链：', rec);
 
   // 3. finalize 由 owner 做，跳过
   console.log('[3] 等 owner finalizeRound（不在本脚本）');

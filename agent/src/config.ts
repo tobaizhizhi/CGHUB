@@ -31,11 +31,34 @@ export const config = {
   },
   // agentSigner 私钥（链下签 EIP-712 proof）
   agentPrivateKey: env('AGENT_PRIVATE_KEY', ''),       // 必须等于链上 agentSigner()
+  signerMode: env('SIGNER_MODE', 'local').toLowerCase() as 'local' | 'cobo',
+  review: {
+    scoreThreshold: Number(env('SCORE_REVIEW_THRESHOLD', '80')),
+    contributorRoundScoreThreshold: Number(env('CONTRIBUTOR_ROUND_SCORE_REVIEW_THRESHOLD', '120')),
+    contributorDailySubmissionThreshold: Number(env('CONTRIBUTOR_DAILY_SUBMISSION_REVIEW_THRESHOLD', '3')),
+    lowQualityRejectThreshold: Number(env('LOW_QUALITY_REJECT_THRESHOLD', '15')),
+  },
   // CAW：用 Cobo SDK 提交链上交易；本地 cobo-tss-node signer 需在线完成钱包签名
   caw: {
     pactId: env('CAW_PACT_ID', ''),
+    signPactId: env('CAW_SIGN_PACT_ID', ''),
+    fundPactId: env('CAW_FUND_PACT_ID', ''),
+    legacyCombinedPact: /^(1|true|yes)$/i.test(env('CAW_LEGACY_COMBINED_PACT', 'false')),
     srcAddress: env('CAW_SRC_ADDRESS', ''), // CAW 钱包 EVM 地址
     chainId: env('COBO_CHAIN_ID', 'SETH'),
+    claimMaxAmount: env('CLAIM_MAX_AMOUNT', '100'), // Policy 单次演示限额(USDC)
+    guardPactId: env('CAW_GUARD_PACT_ID', ''), // 可选：transfer 护栏演示专用 pact
+    guardTokenId: env('CAW_GUARD_TOKEN_ID', 'SETH_USDC'), // Cobo token_id，不是 ERC20 合约地址
+    guardDestination: env('CAW_GUARD_DESTINATION', ''), // 为空则 guard-demo 回转到 CAW_SRC_ADDRESS
+  },
+  autoClaim: {
+    enabled: /^(1|true|yes)$/i.test(env('AUTO_CLAIM_ENABLED', 'false')),
+    intervalMs: Number(env('AUTO_CLAIM_INTERVAL_MS', '10000')),
+    contributors: env('AUTO_CLAIM_CONTRIBUTORS', '')
+      .split(',')
+      .map((address) => address.trim())
+      .filter(Boolean),
+    minPending: BigInt(env('AUTO_CLAIM_MIN_PENDING', '1')),
   },
 };
 

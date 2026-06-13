@@ -1,4 +1,7 @@
 import { useMemo } from "react";
+import { Wallet } from "lucide-react";
+import { LedgerNotice } from "./ledger/LedgerNotice";
+import { RoleButton } from "./ledger/RoleButton";
 
 interface WalletConnectProps {
   address?: string | null;
@@ -24,29 +27,32 @@ export function WalletConnect({
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   }, [address]);
 
-  const networkName = chainId === 11155111 ? "Sepolia" : chainId ? `Chain ${chainId}` : "未知网络";
+  const networkName = chainId === 11155111 ? "Sepolia" : chainId ? `链 ${chainId}` : "未知网络";
 
   return (
-    <div className="wallet-panel">
+    <div className="rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--paper)] p-3 shadow-[var(--shadow-soft)]">
       {isConnected ? (
-        <>
-          <div>
-            <p>已连接钱包</p>
-            <strong>{shortAddress}</strong>
-            <p className="hint">网络：{networkName}</p>
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+          <div className="min-w-0">
+            <p className="m-0 flex items-center gap-1.5 font-[var(--font-mono)] text-xs font-extrabold text-[var(--muted)]">
+              <Wallet size={14} aria-hidden />
+              已连接钱包
+            </p>
+            <strong className="mt-1 block font-[var(--font-mono)] text-sm text-[var(--ink)]">{shortAddress}</strong>
+            <p className="m-0 mt-1 text-xs text-[var(--muted)]">网络：{networkName}</p>
           </div>
-          <button className="button secondary" onClick={onDisconnect}>
+          <RoleButton variant="secondary" size="sm" onClick={onDisconnect}>
             断开连接
-          </button>
-        </>
+          </RoleButton>
+        </div>
       ) : (
-        <>
-          <button className="button primary" disabled={isLoading} onClick={onConnect}>
+        <div className="grid gap-2">
+          <RoleButton size="sm" disabled={isLoading} onClick={onConnect}>
             连接钱包
-          </button>
-          <p className="hint">请安装 MetaMask 或 Cobo Agentic Wallet 浏览器扩展。</p>
-          {error ? <p className="hint">{error}</p> : null}
-        </>
+          </RoleButton>
+          <p className="m-0 text-xs text-[var(--muted)]">请安装 MetaMask 或 Cobo Agentic Wallet 浏览器扩展。</p>
+          {error ? <LedgerNotice tone="error">{error}</LedgerNotice> : null}
+        </div>
       )}
     </div>
   );

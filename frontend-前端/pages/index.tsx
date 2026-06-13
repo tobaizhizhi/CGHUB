@@ -1,252 +1,386 @@
-import { useEffect, useState } from "react";
-import { ContributionForm } from "../components/ContributionForm";
-import { WalletConnect } from "../components/WalletConnect";
-import { DistributionView } from "../components/DistributionView";
-import { useCoboWallet } from "../hooks/useCoboWallet";
-import { useContributionPool } from "../hooks/useContributionPool";
-import { useWallet } from "../hooks/useWallet";
-import { signContribution, submitContribution } from "../lib/agent-api";
+import Link from "next/link";
+import {
+  ArrowRight,
+  BadgeCheck,
+  Bot,
+  BrainCircuit,
+  Code2,
+  FileSignature,
+  GitBranch,
+  Landmark,
+  LucideIcon,
+  ReceiptText,
+  Scale,
+  ShieldCheck,
+  Sprout,
+  WalletCards,
+  Workflow,
+} from "lucide-react";
+import { ENTRY_INTENT_OPTIONS, type EntryIntent } from "../lib/entry-intent";
+import { roleButtonClass } from "../components/ledger/RoleButton";
+import { cn } from "../lib/utils";
 
-interface ContributionItem {
-  id: string;
-  title: string;
-  amount: string;
-  score: string;
-  description: string;
-  status: "pending" | "submitted" | "distributed";
-}
+const roleDetails: Record<
+  EntryIntent,
+  { accent: string; index: string; steps: string[]; cta: string; icon: LucideIcon; summary: string }
+> = {
+  project: {
+    accent: "资金入口",
+    index: "01",
+    steps: ["查看活动资金池", "给活动注资", "跟踪结算状态"],
+    cta: "进入项目方工作台",
+    icon: Landmark,
+    summary: "活动资金、注资和结算状态统一进入链上账本。",
+  },
+  contributor: {
+    accent: "贡献入口",
+    index: "02",
+    steps: ["提交贡献证据", "等待 AI / Cobo 审批", "领取活动收益"],
+    cta: "进入贡献者工作台",
+    icon: Sprout,
+    summary: "贡献者提交证据，评分通过后按链上分数领取收益。",
+  },
+  manager: {
+    accent: "管理入口",
+    index: "03",
+    steps: ["创建活动档案", "新开链上资金池", "关闭活动结算"],
+    cta: "进入管理者工作台",
+    icon: ShieldCheck,
+    summary: "管理者负责活动生命周期、资金池状态和最终结算。",
+  },
+};
 
-export default function Home() {
-  const [contributions, setContributions] = useState<ContributionItem[]>([]);
-  const [distributionResult, setDistributionResult] = useState<string>("");
-  const [message, setMessage] = useState<string>("");
-  const [claiming, setClaiming] = useState(false);
+const capabilityTags = [
+  "Activity funding",
+  "AI rubric",
+  "Cobo App approval",
+  "EIP-712",
+  "CAW execution",
+  "Gasless claim",
+  "Agent Registry",
+];
 
-  const {
-    address,
-    signer,
-    chainId,
-    shortAddress,
-    isConnected,
-    isLoading: walletLoading,
-    error: walletError,
-    connectWallet,
-    disconnect,
-  } = useWallet();
-  const {
-    round,
-    score,
-    claimed,
-    pending,
-    owner,
-    agentSigner,
-    activities,
-    loading: contractLoading,
-    error: contractError,
-    refresh,
-  } = useContributionPool(address, signer);
-  const { connectCoboWallet, requestDistribution } = useCoboWallet();
+const flowSteps = [
+  { label: "Open / Fund", detail: "管理者开池，活动资金进入池子", icon: Landmark },
+  { label: "Evidence", detail: "贡献者提交贡献证据", icon: ReceiptText },
+  { label: "Review", detail: "AI 评分，高风险进 Cobo App", icon: BrainCircuit },
+  { label: "Record", detail: "CAW 写入链上贡献分", icon: FileSignature },
+  { label: "Finalize", detail: "管理者关闭活动并锁定分账", icon: ShieldCheck },
+  { label: "Claim", detail: "贡献者 gasless 领取收益", icon: WalletCards },
+] satisfies { label: string; detail: string; icon: LucideIcon }[];
 
-  const toScore = (scoreValue: string) => {
-    const parsed = Number(scoreValue);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      throw new Error("贡献分数必须大于 0。");
-    }
-    return Math.max(1, Math.round(parsed));
-  };
+const coboPath = [
+  { title: "Cobo App 高风险审批", desc: "高分、高频、累计风险或低置信度不会直接进入资金分配。", icon: Scale },
+  { title: "Cobo Sign Pact 签名", desc: "审批通过后才签 EIP-712 贡献证明。", icon: FileSignature },
+  { title: "CAW 代执行上链", desc: "CAW 代执行记分和领取交易，保留 Cobo 审计链。", icon: Workflow },
+];
 
-  useEffect(() => {
-    const saved = window.localStorage.getItem("cghub-contributions");
-    if (saved) {
-      setContributions(JSON.parse(saved));
-    }
-  }, []);
+const heroRoleCtaClass =
+  "inline-flex min-h-12 min-w-[168px] items-center justify-center gap-2 rounded-[var(--radius-sm)] border border-[var(--line)] bg-[rgba(255,253,247,0.94)] px-5 py-2.5 text-sm font-semibold text-[var(--ink-soft)] no-underline shadow-[var(--shadow-soft)] transition hover:-translate-y-0.5 hover:border-[var(--role-color)] hover:bg-[var(--role-soft)] hover:text-[var(--role-ink)] hover:no-underline";
 
-  useEffect(() => {
-    if (contributions.length > 0) {
-      window.localStorage.setItem("cghub-contributions", JSON.stringify(contributions));
-    }
-  }, [contributions]);
-
-  const handleSubmit = async (values: {
-    title: string;
-    amount: string;
-    score: string;
-    description: string;
-  }) => {
-    const contributionId = `${Date.now()}`;
-    const newContribution: ContributionItem = {
-      id: contributionId,
-      title: values.title,
-      amount: values.amount,
-      score: values.score,
-      description: values.description,
-      status: "pending",
-    };
-
-    setContributions((current) => [newContribution, ...current]);
-    setDistributionResult("");
-
-    try {
-      const contributor = address ?? (await connectWallet());
-      if (!contributor) {
-        throw new Error("请先连接钱包，Agent 需要你的钱包地址作为贡献者地址。");
-      }
-
-      setMessage("正在请求 Agent 签名贡献 proof...");
-      const signed = await signContribution({
-        contributor,
-        score: toScore(values.score),
-        source: "frontend",
-        evidenceId: contributionId,
-        paymentId: `frontend-${contributionId}`,
-      });
-
-      setMessage("Agent 已签名，正在由 executor 钱包提交上链...");
-      const submitted = await submitContribution(signed);
-
-      setContributions((current) =>
-        current.map((item) =>
-          item.id === contributionId ? { ...item, status: "submitted" } : item
-        )
-      );
-      setDistributionResult(`贡献已上链：${submitted.txHash}`);
-      setMessage("贡献已提交上链，正在刷新链上状态。");
-      await refresh();
-      setMessage("贡献已提交上链，链上状态已刷新。");
-    } catch (err) {
-      console.error(err);
-      setMessage(err instanceof Error ? err.message : "贡献提交失败，请检查 Agent API。");
-    }
-  };
-
-  const handleClaim = async () => {
-    setClaiming(true);
-    setDistributionResult("");
-    try {
-      const contributor = address ?? (await connectWallet());
-      if (!contributor) {
-        throw new Error("请先连接钱包，Cobo 代领需要贡献者地址。");
-      }
-
-      setMessage("正在触发 Cobo CAW claimFor 代领...");
-      await connectCoboWallet();
-      const result = await requestDistribution({ contributor });
-      setDistributionResult(result);
-      setMessage("Cobo 代领请求已返回，正在刷新链上状态。");
-      await refresh();
-      setMessage("链上状态已刷新。");
-    } catch (err) {
-      console.error(err);
-      setMessage(err instanceof Error ? err.message : "Cobo 代领失败，请检查 Agent API / CAW signer。");
-    } finally {
-      setClaiming(false);
-    }
-  };
-
+export default function RoleEntryPage() {
   return (
-    <main className="page-shell">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">CGHub MVP 黑客松</p>
-          <h1>前端火堆：ContributionPool 合约对接</h1>
-          <p>目标：读取 Sepolia 合约状态、提交贡献到 Agent，并把签名记录上链。</p>
-        </div>
-        <WalletConnect
-          address={address}
-          isConnected={isConnected}
-          isLoading={walletLoading}
-          error={walletError}
-          chainId={chainId}
-          onConnect={connectWallet}
-          onDisconnect={disconnect}
-        />
-      </header>
-
-      <section className="panel">
-        <div className="panel-header">
-          <h2>贡献提交</h2>
-          <p>填写贡献内容后，前端会调用 Agent 签名，再由 executor 钱包提交到 ContributionPool。</p>
-        </div>
-        <ContributionForm onSubmit={handleSubmit} />
-      </section>
-
-      <section className="panel grid-two">
-        <div>
-          <div className="panel-header">
-            <h2>链上合约状态</h2>
+    <main className="min-h-screen bg-[var(--bg)] text-[var(--ink)]">
+      <nav className="sticky top-0 z-20 border-b border-[var(--line)] bg-[rgba(251,250,247,0.92)] backdrop-blur">
+        <div className="mx-auto flex h-14 w-full max-w-[1180px] items-center justify-between gap-4 px-4 md:px-8">
+          <div className="flex items-center gap-3">
+            <Link href="/" className="font-[var(--font-display)] text-xl font-bold text-[var(--ink)] no-underline hover:text-[var(--project)] hover:no-underline">
+              CGHub
+            </Link>
+            <span className="hidden rounded-full border border-[var(--line)] bg-[var(--paper-soft)] px-3.5 py-1.5 text-[0.82rem] font-medium text-[var(--muted)] sm:inline-flex">
+              活动结算系统
+            </span>
           </div>
-          <div className="status-box">
-            <p>{message || "请连接钱包并刷新链上数据。"}</p>
-            <p>合约读取：{contractLoading ? "加载中..." : contractError ? contractError : "正常"}</p>
-            <p>当前钱包：{address ? shortAddress : "未连接"}</p>
-            <p>Owner：{owner ? `${owner.slice(0, 6)}...${owner.slice(-4)}` : "未知"}</p>
-            <p>Agent Signer：{agentSigner ? `${agentSigner.slice(0, 6)}...${agentSigner.slice(-4)}` : "未知"}</p>
-            <p>当前分数：{score}</p>
-            <p>已领取：{claimed}</p>
-            <p>可领取：{pending}</p>
-            <p>Round 是否存在：{round ? (round.exists ? "是" : "否") : "未知"}</p>
-            <p>Round 是否 finalize：{round ? (round.finalized ? "已结束" : "未结束") : "未知"}</p>
-            <div className="action-row">
-              <button className="button secondary" onClick={refresh}>
-                刷新链上数据
-              </button>
-              <button className="button" onClick={handleClaim} disabled={claiming || !address}>
-                {claiming ? "代领中..." : "Cobo 代领"}
-              </button>
+          <div className="hidden items-center gap-7 text-sm font-medium text-[var(--muted)] md:flex">
+            <a href="#flow" className="text-[var(--muted)] no-underline hover:text-[var(--ink)] hover:no-underline">
+              流程
+            </a>
+            <a href="#cobo" className="text-[var(--muted)] no-underline hover:text-[var(--ink)] hover:no-underline">
+              Cobo
+            </a>
+            <a href="#roles" className="text-[var(--muted)] no-underline hover:text-[var(--ink)] hover:no-underline">
+              角色
+            </a>
+          </div>
+          <Link
+            href="#roles"
+            className="inline-flex min-h-9 items-center justify-center gap-2 rounded-[var(--radius-sm)] border border-[var(--line)] bg-[var(--paper)] px-3.5 py-1.5 text-xs font-semibold text-[var(--ink-soft)] no-underline shadow-[var(--shadow-soft)] transition hover:-translate-y-0.5 hover:border-[var(--project)] hover:bg-[var(--project-soft)] hover:text-[var(--role-ink)] hover:no-underline"
+          >
+            选择角色
+            <ArrowRight size={15} aria-hidden />
+          </Link>
+        </div>
+      </nav>
+
+      <section className="mx-auto w-full max-w-[1180px] px-4 pb-16 pt-8 md:px-8 md:pb-20 md:pt-10">
+        <section
+          className="relative mx-auto grid min-h-[520px] max-w-[990px] place-items-center overflow-hidden rounded-[22px] border border-[var(--line)] bg-[var(--paper)] px-6 py-16 text-center shadow-[var(--shadow)] md:px-12 md:py-20"
+          aria-labelledby="role-entry-title"
+        >
+          <div className="absolute inset-0 opacity-[0.58] [background-image:linear-gradient(rgba(185,170,147,.34)_1px,transparent_1px),linear-gradient(90deg,rgba(185,170,147,.28)_1px,transparent_1px)] [background-size:36px_36px]" />
+          <div className="absolute inset-x-10 top-0 h-1 bg-gradient-to-r from-[var(--project)] via-[var(--contributor)] to-[var(--manager)] opacity-80" />
+          <div className="relative z-10 mx-auto grid max-w-3xl justify-items-center gap-6">
+            <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--paper-soft)] px-3.5 py-1.5 text-[0.86rem] font-medium text-[var(--ink-soft)]">
+              <Bot size={13} aria-hidden />
+              Cobo 审批与代执行
+            </span>
+
+            <div className="grid gap-4">
+              <h1
+                id="role-entry-title"
+                className="m-0 text-balance font-[var(--font-display)] text-4xl font-bold leading-[1.04] text-[var(--ink)] md:text-6xl"
+              >
+                让资金按真实贡献分配的系统
+              </h1>
+              <p className="m-0 mx-auto max-w-2xl text-base leading-7 text-[var(--ink-soft)] md:text-lg">
+                CGHub 让管理者创建活动资金池，项目方注资、用户付费或其他活动收入进入池子；贡献者提交证据，AI 按 rubric 评分，高风险结果进入 Cobo App 审批，活动关闭后支持 gasless claim。
+              </p>
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-3">
+              <Link
+                href="/project"
+                className={cn("role-project", heroRoleCtaClass)}
+              >
+                <span className="h-2 w-2 rounded-full bg-[var(--role-color)]" aria-hidden />
+                查看活动资金池
+                <ArrowRight size={16} aria-hidden />
+              </Link>
+              <Link
+                href="/contributor"
+                className={cn("role-contributor", heroRoleCtaClass)}
+              >
+                <span className="h-2 w-2 rounded-full bg-[var(--role-color)]" aria-hidden />
+                提交贡献证据
+                <ArrowRight size={16} aria-hidden />
+              </Link>
+              <Link
+                href="/manager"
+                className={cn("role-manager", heroRoleCtaClass)}
+              >
+                <span className="h-2 w-2 rounded-full bg-[var(--role-color)]" aria-hidden />
+                管理活动结算
+                <ArrowRight size={16} aria-hidden />
+              </Link>
+            </div>
+
+            <div className="mt-4 grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
+              <span className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--line)] bg-[var(--paper-soft)] px-4 text-[0.92rem] font-medium text-[var(--dim)]">
+                open pool -&gt; fund -&gt; evidence
+              </span>
+              <span className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--line)] bg-[var(--paper-soft)] px-4 text-[0.92rem] font-medium text-[var(--dim)]">
+                review -&gt; record -&gt; finalize -&gt; claim
+              </span>
             </div>
           </div>
-        </div>
-        <DistributionView result={distributionResult} />
-      </section>
+        </section>
 
-      <section className="panel">
-        <div className="panel-header">
-          <h2>贡献记录</h2>
-        </div>
-        <div className="contribution-list">
-          {contributions.length === 0 ? (
-            <p>暂无贡献记录，提交后会在这里显示。</p>
-          ) : (
-            contributions.map((item) => (
-              <article key={item.id} className="contribution-card">
-                <h3>{item.title}</h3>
-                <p>{item.description}</p>
-                <p>金额：{item.amount}</p>
-                <p>分数：{item.score}</p>
-                <p>状态：{item.status}</p>
-              </article>
-            ))
-          )}
+        <div className="mx-auto mt-10 flex max-w-[880px] flex-wrap justify-center gap-x-9 gap-y-3 text-[0.96rem] font-medium text-[var(--dim)]">
+          {capabilityTags.map((tag) => (
+            <span key={tag}>{tag}</span>
+          ))}
         </div>
       </section>
 
-      <section className="panel">
-        <div className="panel-header">
-          <h2>链上审计日志</h2>
+      <section id="flow" className="mx-auto grid w-full max-w-[1180px] gap-8 px-4 py-14 md:px-8 md:py-20">
+        <div className="mx-auto grid max-w-3xl justify-items-center gap-3 text-center">
+          <span className="font-[var(--font-mono)] text-xs font-extrabold uppercase tracking-[0.18em] text-[var(--dim)]">
+            The settlement path
+          </span>
+          <h2 className="m-0 font-[var(--font-display)] text-3xl leading-tight text-[var(--ink)] md:text-5xl">
+            从资金到领取，只保留必要步骤
+          </h2>
+          <p className="m-0 max-w-2xl text-base leading-7 text-[var(--muted)]">
+            项目方、贡献者和管理者各自完成自己的动作，Cobo 负责审批、签名、执行和审计。
+          </p>
         </div>
-        <div className="activity-list">
-          {activities.length === 0 ? (
-            <p>最近区块内暂无事件。可调大 NEXT_PUBLIC_EVENT_LOOKBACK_BLOCKS 后刷新。</p>
-          ) : (
-            activities.map((activity) => (
-              <article key={activity.id} className="activity-row">
-                <div>
-                  <strong>{activity.title}</strong>
-                  <p>{activity.detail}</p>
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {flowSteps.map((step, index) => {
+            const Icon = step.icon;
+            return (
+              <article
+                key={step.label}
+                className="grid min-h-[170px] content-between gap-5 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--paper)] p-5 shadow-[var(--shadow-soft)]"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--project)_30%,var(--line))] bg-[var(--project-soft)] text-[var(--project)]">
+                    <Icon size={19} aria-hidden />
+                  </span>
+                  <span className="font-[var(--font-mono)] text-xs font-extrabold text-[var(--dim)]">
+                    0{index + 1}
+                  </span>
                 </div>
-                <a
-                  href={`https://sepolia.etherscan.io/tx/${activity.txHash}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  #{activity.blockNumber}
-                </a>
+                <div className="grid gap-1">
+                  <strong className="font-[var(--font-display)] text-2xl leading-tight text-[var(--ink)]">{step.label}</strong>
+                  <p className="m-0 text-sm leading-6 text-[var(--muted)]">{step.detail}</p>
+                </div>
               </article>
-            ))
-          )}
+            );
+          })}
         </div>
       </section>
+
+      <section id="cobo" className="mx-auto grid w-full max-w-[1180px] gap-14 border-t border-[var(--line)] px-4 py-16 md:px-8 md:py-20">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,0.82fr)] lg:items-center">
+          <div className="grid gap-5">
+            <span className="inline-flex w-max items-center rounded-full border border-[var(--line)] bg-[var(--paper-soft)] px-3 py-1 font-[var(--font-mono)] text-[0.68rem] font-extrabold uppercase text-[var(--dim)]">
+              Cobo control layer
+            </span>
+            <h2 className="m-0 max-w-2xl font-[var(--font-display)] text-3xl leading-tight text-[var(--ink)] md:text-5xl">
+              关键结算动作，由 Cobo 留下审批和执行记录
+            </h2>
+            <ul className="m-0 grid gap-3 p-0 text-base leading-7 text-[var(--ink-soft)]">
+              <li>项目方资金池决定可分配总额，贡献评分决定每个人的分配比例。</li>
+              <li>评分会影响资金分配，风险评分必须先经过 Cobo App 审批。</li>
+              <li>Cobo approve 后才出现可用签名，CAW 再把贡献分数写到链上。</li>
+              <li>领取阶段不重复人工审核，由 Cobo 代付执行确定金额的 claimFor。</li>
+            </ul>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/replay"
+                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-[color-mix(in_srgb,var(--project)_30%,var(--line))] bg-[var(--project-soft)] px-4 py-2 text-sm font-extrabold text-[var(--project)] no-underline hover:no-underline"
+              >
+                查看审计回放
+                <ArrowRight size={15} aria-hidden />
+              </Link>
+              <Link
+                href="/manager"
+                className="role-manager inline-flex min-h-10 items-center gap-2 rounded-full border border-[color-mix(in_srgb,var(--role-color)_30%,var(--line))] bg-[var(--role-soft)] px-4 py-2 text-sm font-extrabold text-[var(--role-ink)] no-underline hover:no-underline"
+              >
+                管理结算
+                <ArrowRight size={15} aria-hidden />
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid gap-3 rounded-[22px] border border-[var(--line)] bg-[var(--paper)] p-5 shadow-[var(--shadow-soft)]">
+            {coboPath.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.title} className="grid grid-cols-[44px_minmax(0,1fr)] gap-4 rounded-[var(--radius-md)] border border-[var(--line)] bg-[var(--paper-soft)] p-4">
+                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-sm)] border border-[color-mix(in_srgb,var(--manager)_30%,var(--line))] bg-[var(--manager-soft)] text-[var(--manager)]">
+                    <Icon size={19} aria-hidden />
+                  </span>
+                  <div className="min-w-0">
+                    <strong className="block text-sm font-extrabold text-[var(--ink)]">{item.title}</strong>
+                    <p className="m-0 mt-1 text-sm leading-6 text-[var(--muted)]">{item.desc}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="grid gap-5 lg:grid-cols-2">
+          <div className="rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--paper-soft)] p-5">
+            <div className="mb-5 flex items-center justify-between border-b border-[var(--line)] pb-3 font-[var(--font-mono)] text-[0.7rem] font-extrabold uppercase text-[var(--dim)]">
+              <span>仅后端处理</span>
+              <span>缺少独立审批</span>
+            </div>
+            <pre className="font-[var(--font-mono)] text-sm leading-7 text-[var(--dim)]">
+{`score = await agent.score(evidence)
+signature = backend.sign(score)
+pool.recordContribution(score)
+
+// score changes allocation directly`}
+            </pre>
+          </div>
+          <div className="rounded-[var(--radius-lg)] border border-[color-mix(in_srgb,var(--contributor)_26%,var(--line))] bg-[color-mix(in_srgb,var(--contributor-soft)_62%,var(--paper))] p-5">
+            <div className="mb-5 flex items-center justify-between border-b border-[color-mix(in_srgb,var(--contributor)_22%,var(--line))] pb-3 font-[var(--font-mono)] text-[0.7rem] font-extrabold uppercase text-[var(--contributor)]">
+              <span>CGHub + Cobo</span>
+              <span>审批后执行</span>
+            </div>
+            <pre className="font-[var(--font-mono)] text-sm leading-7 text-[var(--ink-soft)]">
+{`review = await cobo.requestApproval(risk)
+proof = await cobo.signTypedData(review)
+caw.recordContributionBySig(proof)
+
+// approval before allocation`}
+            </pre>
+          </div>
+        </div>
+      </section>
+
+      <section id="roles" className="mx-auto grid w-full max-w-[1180px] gap-8 border-t border-[var(--line)] px-4 py-16 md:px-8 md:py-20">
+        <div className="flex flex-wrap items-end justify-between gap-5">
+          <div className="grid gap-3">
+            <span className="font-[var(--font-mono)] text-xs font-extrabold uppercase tracking-[0.18em] text-[var(--dim)]">
+              Choose workspace
+            </span>
+            <h2 className="m-0 font-[var(--font-display)] text-3xl leading-tight text-[var(--ink)] md:text-5xl">
+              三个入口，各做一件事
+            </h2>
+          </div>
+          <p className="m-0 max-w-xl text-base leading-7 text-[var(--muted)]">
+            项目方、贡献者和管理者分别进入自己的工作台；每个页面只展示当前角色需要处理的资金、贡献或管理动作。
+          </p>
+        </div>
+
+        <div className="grid gap-5 lg:grid-cols-3">
+          {ENTRY_INTENT_OPTIONS.map((option) => {
+            const detail = roleDetails[option.intent];
+            const Icon = detail.icon;
+            return (
+              <Link
+                key={option.intent}
+                className={cn(
+                  `role-${option.intent}`,
+                  "group grid min-h-[290px] content-between gap-6 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--paper)] p-6 text-[var(--ink)] no-underline shadow-[var(--shadow-soft)] transition hover:-translate-y-1 hover:border-[color-mix(in_srgb,var(--role-color)_52%,var(--line))] hover:no-underline"
+                )}
+                href={option.defaultHref}
+              >
+                <div className="grid gap-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <span className="inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--role-color)_35%,var(--line))] bg-[var(--role-soft)] text-[var(--role-ink)]">
+                      <Icon size={20} aria-hidden />
+                    </span>
+                    <span className="font-[var(--font-mono)] text-xs font-extrabold text-[var(--dim)]">
+                      {detail.index} / {detail.accent}
+                    </span>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <span className="text-sm font-extrabold text-[var(--role-ink)]">{option.audience}</span>
+                    <strong className="font-[var(--font-display)] text-3xl leading-tight text-[var(--ink)]">
+                      {option.label}
+                    </strong>
+                    <p className="m-0 text-sm leading-6 text-[var(--muted)]">{detail.summary}</p>
+                  </div>
+
+                  <ul className="grid gap-2 p-0 text-sm font-bold text-[var(--ink-soft)]">
+                    {detail.steps.map((step) => (
+                      <li key={step} className="flex items-center gap-2">
+                        <BadgeCheck size={15} aria-hidden className="text-[var(--role-color)]" />
+                        {step}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <span className={cn(roleButtonClass({ variant: "primary", size: "md" }), "w-full justify-between")}>
+                  {detail.cta}
+                  <ArrowRight size={16} aria-hidden className="transition group-hover:translate-x-0.5" />
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
+      <footer className="border-t border-[var(--line)] px-4 py-8 md:px-8">
+        <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-3 font-[var(--font-mono)] text-xs font-extrabold text-[var(--dim)]">
+          <span>CGHub Ledger</span>
+          <span className="inline-flex items-center gap-2">
+            <Code2 size={14} aria-hidden />
+            AI scoring · Cobo approval · On-chain settlement
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <GitBranch size={14} aria-hidden />
+            On-chain settlement path
+          </span>
+        </div>
+      </footer>
     </main>
   );
 }

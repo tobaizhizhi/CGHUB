@@ -1,35 +1,37 @@
-# CGHub MVP 前端
+# CGHub Settlement Frontend
 
-本目录为 CGHub 黑客松前端火堆的最小可运行实现。目标是：
+This Next.js app is the CGHub settlement workspace for contribution rounds.
 
-- 贡献提交页面
-- 钱包连接（MetaMask / Cobo 预留）
-- Agent 签名 + CAW executor 上链提交
-- Cobo `claimFor` 代领触发逻辑
-- 贡献记录、链上 Round、分账结果与审计事件 Dashboard
+It is organized around real user workflows:
 
-## 快速启动
+- Overview: round status, next action, funding and contribution progress.
+- Contributions: submit work and review Agent scores.
+- Payouts: review payout shares, finalize the round, and claim.
+- Treasury: inspect funding, Cobo Agent Wallet status, balances, policies, and approvals.
+- Activity: review settlement actions, chain transactions, and Cobo audit details.
+- Replay: round history and full audit replay.
+
+## Quick Start
 
 ```bash
-cd creators-galaxy/02-projects/cghub-mvp-hackathon/frontend-前端
+cd cghub-mvp-hackathon/frontend-前端
 npm install
 npm run dev
 ```
 
-打开 `http://localhost:3000`，即可查看前端演示页面。
+Open `http://localhost:3000` for the workspace.
 
-## 说明
+Useful routes:
 
-- `pages/index.tsx`：贡献提交主界面
-- `pages/dashboard.tsx`：贡献记录仪表盘
-- `components/WalletConnect.tsx`：钱包连接组件
-- `components/ContributionForm.tsx`：贡献提交表单
-- `components/DistributionView.tsx`：分账结果展示
-- `hooks/useCoboWallet.ts`：Cobo Wallet 状态和请求封装
-- `lib/cobo-sdk.ts`：Cobo 分账请求入口，调用 Agent 后端 `/api/trigger-claim`
+- `/`
+- `/contributions`
+- `/payouts`
+- `/treasury`
+- `/activity`
+- `/replay`
 
-## 后续集成建议
+## Notes
 
-1. 启动 `agent/` 后端 `npm run api`，确保 `/api/sign-contribution`、`/api/submit-contribution`、`/api/trigger-claim` 可用。
-2. 配置可用的 Sepolia RPC：`NEXT_PUBLIC_RPC_URL`。
-3. 如需更完整的历史审计，调大 `NEXT_PUBLIC_EVENT_LOOKBACK_BLOCKS`。
+- Frontend public config is limited to `NEXT_PUBLIC_*`.
+- Cobo API keys, wallet UUIDs, pact credentials, and Agent private keys belong only in the Agent service environment.
+- Start `agent/` with `npm run api` for signing, submission, claim, Cobo status, decisions, and audit APIs.

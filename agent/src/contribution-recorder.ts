@@ -6,12 +6,21 @@
 
 import { ethers } from 'ethers';
 import { config, EIP712_DOMAIN, EIP712_TYPES } from './config.js';
+import { signProofWithMode } from './proof-signer.js';
 import type { ContributionInput, ContributionProof, SignedContribution } from './types.js';
 
 const wallet = () => new ethers.Wallet(config.agentPrivateKey);
 
 // proofHash 的盐，以合约侧为准：合约脚本 RecordDemoContribution.s.sol 的 PROOF_SALT 默认 "demo-proof"
 const PROOF_SALT_DEFAULT = 'demo-proof';
+
+function selectedProjectId(input: ContributionInput): bigint {
+  return input.projectId === undefined ? config.round.projectId : BigInt(input.projectId);
+}
+
+function selectedRoundId(input: ContributionInput): bigint {
+  return input.roundId === undefined ? config.round.roundId : BigInt(input.roundId);
+}
 
 /**
  * proofHash：防重放 key，必须唯一非零。
@@ -22,7 +31,7 @@ const PROOF_SALT_DEFAULT = 'demo-proof';
 function buildProofHash(input: ContributionInput, nonce: bigint): string {
   return ethers.solidityPackedKeccak256(
     ['string', 'uint256', 'uint256', 'address', 'uint256'],
-    [input.proofSalt ?? PROOF_SALT_DEFAULT, config.round.projectId, config.round.roundId, input.contributor, nonce],
+    [input.proofSalt ?? PROOF_SALT_DEFAULT, selectedProjectId(input), selectedRoundId(input), input.contributor, nonce],
   );
 }
 
@@ -33,7 +42,7 @@ function buildProofHash(input: ContributionInput, nonce: bigint): string {
 function buildPaymentIdHash(input: ContributionInput, nonce: bigint): string {
   return ethers.solidityPackedKeccak256(
     ['string', 'uint256', 'uint256', 'address', 'uint256'],
-    [input.paymentId, config.round.projectId, config.round.roundId, input.contributor, nonce],
+    [input.paymentId, selectedProjectId(input), selectedRoundId(input), input.contributor, nonce],
   );
 }
 
@@ -41,8 +50,8 @@ function buildPaymentIdHash(input: ContributionInput, nonce: bigint): string {
 export function buildProof(input: ContributionInput): ContributionProof {
   const nonce = BigInt(Date.now()); // 最小实现，先用时间戳保唯一；TODO 换成可靠 nonce 源
   return {
-    projectId: config.round.projectId,
-    roundId: config.round.roundId,
+    projectId: selectedProjectId(input),
+    roundId: selectedRoundId(input),
     contributor: input.contributor,
     score: BigInt(input.score),
     proofHash: buildProofHash(input, nonce),
@@ -66,9 +75,11 @@ export function selfVerify(proof: ContributionProof, signature: string): boolean
 /** 一步到位：组装 + 签名 + 自检 */
 export async function recordContribution(input: ContributionInput): Promise<SignedContribution> {
   const proof = buildProof(input);
-  const signature = await signProof(proof);
-  if (!selfVerify(proof, signature)) {
-    throw new Error('自检失败：签名恢复地址 != agentSigner，检查 AGENT_PRIVATE_KEY');
-  }
-  return { proof, signature };
+  const signed = await signProofWithMode(proof);
+  return {
+    proof,
+    signature: signed.signature,
+    signerMode: signed.signerMode,
+    signerAddress: signed.signerAddress,
+  };
 }

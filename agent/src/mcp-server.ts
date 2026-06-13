@@ -11,6 +11,7 @@ import { signContributionTool } from '../tools/sign-contribution.js';
 import { submitContributionTool } from '../tools/submit-contribution.js';
 import { checkPendingTool } from '../tools/check-pending.js';
 import { triggerClaimTool } from '../tools/trigger-claim.js';
+import { getAuditTool } from '../tools/get-audit.js';
 
 const server = new McpServer({ name: 'cghub-agent', version: '0.1.0' });
 
@@ -39,6 +40,11 @@ server.registerTool(
   triggerClaimTool.name,
   { description: triggerClaimTool.description, inputSchema: triggerClaimTool.inputSchema },
   async (args) => asResult(await triggerClaimTool.handler(args)),
+);
+server.registerTool(
+  getAuditTool.name,
+  { description: getAuditTool.description, inputSchema: getAuditTool.inputSchema },
+  async (args) => asResult(await getAuditTool.handler(args)),
 );
 
 const transport = new StdioServerTransport();
