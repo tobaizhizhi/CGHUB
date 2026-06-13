@@ -10,6 +10,7 @@ import {
   formatActivityResult,
   formatRoundStatus,
   getNextAction,
+  sumContributorPendingTotal,
 } from "../lib/settlement-workspace";
 
 describe("deriveRoundStatus", () => {
@@ -254,6 +255,19 @@ describe("buildContributorSnapshots", () => {
         pending: "7",
       },
     ]);
+  });
+});
+
+describe("sumContributorPendingTotal", () => {
+  it("sums raw pending payout amounts with bigint-safe parsing", () => {
+    assert.equal(
+      sumContributorPendingTotal([
+        { pending: "30000000" },
+        { pending: "60000000" },
+        { pending: "not-a-number" },
+      ]),
+      "90000000"
+    );
   });
 });
 

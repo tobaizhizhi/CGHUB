@@ -85,6 +85,27 @@
       "endsAt": "2026-06-13T08:23",
       "createdAt": "2026-06-13T00:23:26.131Z",
       "updatedAt": "2026-06-13T00:24:14.146Z"
+    },
+    {
+      "id": "project-5-round-1",
+      "projectId": "5",
+      "roundId": "1",
+      "activityName": "CGHub 黑客松贡献奖励池",
+      "activityDescription": "本活动用于记录和结算 CGHub 黑客松期间的真实贡献。贡献范围包括前端页面开发、Agent 后端能力、Cobo Agentic Wallet 集成、智能合约联调、文档与路演材料完善、Demo 流程优化、Bug 修复和测试验证等。",
+      "roundName": "第一轮",
+      "tokenAddress": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+      "tokenSymbol": "USDC",
+      "ownerAddress": "0x6f933fdc96Ee0BDEF306621C739ffdFc846c681a",
+      "chainId": 11155111,
+      "poolAddress": "0x876A0741223EDdaE081Ef22beA513E92335B1Bd5",
+      "createTxHash": "0xe53ea0e0d0a0f208caafd5a3b5b11615c2865c32b1333572b3ed3a7671e29c25",
+      "status": "open",
+      "contributorCount": 0,
+      "createdBy": "0x6f933fdc96Ee0BDEF306621C739ffdFc846c681a",
+      "startsAt": "2026-06-13T21:20",
+      "endsAt": "2026-06-18T21:20",
+      "createdAt": "2026-06-13T13:20:24.011Z",
+      "updatedAt": "2026-06-13T13:20:53.542Z"
     }
   ]
 }

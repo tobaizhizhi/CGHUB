@@ -22,6 +22,7 @@ import {
   formatUsdc,
   getNextAction,
   shortAddress,
+  sumContributorPendingTotal,
   type SettlementRole,
 } from "../lib/settlement-workspace";
 import { deriveViewerIdentity } from "../lib/viewer-role";
@@ -60,7 +61,7 @@ export function useSettlementData(scope?: SettlementDataScope) {
   );
 
   const pendingTotal = useMemo(
-    () => contributors.reduce((total, contributor) => total + toBigInt(contributor.pending), 0n).toString(),
+    () => sumContributorPendingTotal(contributors),
     [contributors]
   );
   const status = deriveRoundStatus(pool.round, pendingTotal);

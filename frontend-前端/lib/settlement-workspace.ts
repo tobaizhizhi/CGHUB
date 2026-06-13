@@ -254,6 +254,10 @@ export function buildContributorSnapshots(input: BuildContributorSnapshotsInput)
   }));
 }
 
+export function sumContributorPendingTotal(contributors: Array<Pick<ContributorSnapshot, "pending">>) {
+  return contributors.reduce((total, contributor) => total + toBigInt(contributor.pending), 0n).toString();
+}
+
 export function buildActivityTimeline(input: BuildActivityTimelineInput): ActivityItem[] {
   const items: ActivityItem[] = [];
 

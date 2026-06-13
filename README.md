@@ -5,7 +5,8 @@
 **一句话简介**：CGHub 用 Agent 评估贡献，用 Cobo 审批与执行关键动作，并用链上资金池按可验证贡献分自动分配奖励。
 ## Demo Video
 
-demo链接：https://youtu.be/md2vfMMJlvo
+5分钟精简版demo视频演示链接：https://youtu.be/T-RQU9cLON8
+全过程demo视频演示链接：https://youtu.be/md2vfMMJlvo
 
 ## 项目简介
 
