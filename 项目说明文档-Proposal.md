@@ -1,12 +1,23 @@
 # CGHub 贡献结算 Agent Proposal
 
+demo链接：https://youtu.be/md2vfMMJlvo
+
 ## 一句话简介
 
 CGHub 是一个面向 Hackathon、Grant、开源协作和社区活动的 AI 贡献结算系统：贡献者提交证据，AI Agent 按 rubric 评分，Cobo Agentic Wallet 审批与执行关键动作，链上资金池按贡献分自动结算奖励。
 
+## 应用场景
+
+CGHub 适合需要“资金进入活动池，再按真实贡献结算”的活动型协作场景。资金可以是预设预算，也可以在活动进行中由用户使用、付费或赞助持续进入。
+
+- **黑客松奖金分配**：把奖金池和贡献评分流程透明化，避免只靠人工表格和主观印象分配奖励。
+- **用户付费活动**：活动一边举办，一边让用户通过报名、使用、购买服务或参与任务产生资金流入，最后按贡献分结算给贡献者。
+- **付费众测奖励池**：项目方或活动方可以先放入一部分预算，也可以在活动过程中继续追加，再按 Bug 复现、交互反馈、测试记录和修复贡献结算。
+- **开源社区贡献激励**：项目方为文档补充、PR 修复、Issue 复现、运营传播等社区贡献设置资金池，让贡献者按可验证产出获得奖励。
+
 ## 1. 问题
 
-Hackathon、Grant、开源社区和活动型协作通常会遇到一个共同问题：资金已经进入活动或奖励池，但贡献价值很难被公平、透明、可追踪地结算。
+Hackathon、Grant、开源社区和活动型协作通常会遇到一个共同问题：活动资金可能来自预设预算、赞助资金或用户付费收入，但贡献价值很难被公平、透明、可追踪地结算。
 
 当前常见做法依赖人工表格、聊天记录和主观评审，主要问题包括：
 
@@ -23,31 +34,33 @@ CGHub 将活动奖励结算拆成三个核心对象：
 
 - **活动 / Round**：管理者创建活动，并在链上开设对应资金池。
 - **贡献证据**：贡献者提交 GitHub 链接、URL 或文本说明，作为 AI Agent 评分依据。
-- **链上贡献分**：AI Agent 评分通过审批后，生成 EIP-712 贡献证明，并写入 `ContributionPool` 合约。
+- **链上贡献分**：AI Agent 评分通过 review 后，生成 EIP-712 typed data 签名请求；CAW 在 Sign Pact 约束下完成 `messageSign`，再由 Main Pact 把签名后的 `ContributionProof` 写入 `ContributionPool` 合约。
 
 完整流程如下：
 
 ```text
 管理者创建活动和 Round
-  -> 资金方 / 用户向活动资金池注资
+  -> 预算注入或用户付费让资金进入 Round
   -> 贡献者提交贡献证据
   -> AI Agent 解析证据并按 rubric 评分
-  -> 风险策略判断是否需要 Cobo 审批
-  -> Cobo Agentic Wallet 签名 / 执行受限链上动作
-  -> ContributionPool 记录贡献分
+  -> Agent review gate 判断评分风险
+  -> Agent 生成 EIP-712 typed data 签名请求
+  -> CAW 在 Sign Pact 约束下 messageSign，必要时进入 Cobo App 审批
+  -> CAW Main Pact 使用签名后的 proof 写入链上贡献分
   -> 活动结束后 finalize
-  -> 贡献者按分数占比领取奖励
+  -> 贡献者 claim 或 Agent 代触发 claimFor
 ```
 
 这个方案的关键不是让 AI 直接“发钱”，而是让 AI Agent 生成可解释的贡献评分，再通过 Cobo Agentic Wallet 对签名、审批和链上执行设置边界。
 
 ## 3. 目标用户
 
-CGHub 的目标用户不是泛泛的 Web3 用户，而是**需要把一笔活动或社区预算，按贡献证据公开、可解释、可审计地分配出去的组织方**。他们通常已经有奖金池、Grant 预算或社区资金，但缺少一套可信的贡献评分和结算流程。
+CGHub 的目标用户不是泛泛的 Web3 用户，而是**需要把活动预算、社区资金或用户付费收入，按贡献证据公开、可解释、可审计地分配出去的组织方**。他们可能已经有奖金池、Grant 预算或社区资金，也可能希望在活动过程中持续接收用户付费并按贡献结算。
 
 ### 核心目标用户
 
 - **黑客松 / 社区活动组织方**：活动结束后需要根据参赛者和志愿者的实际贡献分配奖金，但贡献来源包括代码、文档、设计、运营、宣传和组织工作，单靠人工表格容易产生争议。
+- **用户付费活动运营方**：希望活动一边运行，一边把报名、使用、购买服务或参与任务产生的收入纳入资金池，并在活动结束后按真实贡献结算给贡献者。
 - **Grant / 开源资助计划管理者**：需要把预算发给真正产生贡献的人，并留下清晰的证据、评分理由、审批记录和链上结算结果。
 - **DAO / 社区财库负责人**：需要对外说明资金为什么发给某些贡献者，避免“谁决定、凭什么、钱去哪了”无法解释。
 - **开源项目或开发者社区维护者**：需要长期激励 PR、Issue、Commit、文档、维护、答疑等贡献，并把贡献历史沉淀为可复盘的账本。
@@ -57,7 +70,7 @@ CGHub 的目标用户不是泛泛的 Web3 用户，而是**需要把一笔活动
 这些人不一定是系统的购买或发起方，但会直接参与流程：
 
 - **贡献者**：提交贡献证据，查看 AI Agent 评分、审批状态和可领取奖励。
-- **资金方 / 赞助方**：向活动资金池注资，并查看资金是否按规则进入贡献者分账。
+- **用户 / 资金方 / 赞助方**：用户通过付费使用产生资金流入，资金方或赞助方也可以通过预算、注资或赞助让资金进入 Round，并查看资金是否按规则进入贡献者分账。
 - **管理者 / 运营人员**：配置活动、处理高风险贡献审批、关闭活动并完成结算。
 
 ### 暂不优先覆盖的用户
@@ -90,9 +103,9 @@ Agent 是系统的评分、审批和执行编排层，主要能力包括：
 
 - 解析贡献证据，支持 GitHub PR、Issue、Commit、Repo、URL 和文本。
 - 使用 AI Agent rubric 对贡献进行评分，输出分数、理由、维度拆解和风险标记。
-- 根据风险策略判断贡献是否自动通过、进入 Cobo 审批、拒绝或需要补充证据。
-- 生成 EIP-712 `ContributionProof`，并通过 Cobo message sign 签名。
-- 调用 Cobo Agentic Wallet 进行受限 `contractCall`，把贡献分写入链上。
+- 通过 Agent review gate 判断贡献是否自动通过、进入 Cobo 签名审批、拒绝或需要补充证据。
+- 生成 EIP-712 typed data 签名请求，并请求 CAW 在 Sign Pact 约束下完成 `messageSign`。
+- 调用 CAW Main Pact 进行受限 `contractCall`，把签名后的 `ContributionProof` 写入链上，并在结算后代触发 `claimFor`。
 - 记录 Agent 决策、贡献审批记录、活动事件和 Cobo 状态，供前端复盘。
 
 ### Cobo Agentic Wallet
@@ -100,28 +113,30 @@ Agent 是系统的评分、审批和执行编排层，主要能力包括：
 Cobo Agentic Wallet 用于约束 Agent 的链上权限：
 
 - 通过 Pact 限制 Agent 可调用的合约和函数。
-- 高风险贡献评分进入 Cobo App 审批。
-- 审批通过后再进行 message sign 或 contract call。
+- 高风险贡献评分在 CAW `messageSign` 请求阶段进入 Cobo App 审批。
+- 审批通过后，CAW 才会返回可用于 `ContributionPool` 验证的签名；写链和代领再由 Main Pact 的受限 `contractCall` 完成。
 - 记录签名、执行、拒绝和待审批状态，形成审计线索。
 
 CGHub 中的 Pact 是按权限面拆分的，而不是用一个万能后端钱包覆盖所有动作：
 
 | Pact | 主要权限 | 在 CGHub 中的作用 |
 |------|----------|-------------------|
-| Sign Pact | `messageSign` | 只为 EIP-712 `ContributionProof` / `ContributionReviewApproval` 签名，高风险评分进入 Cobo App 审批。 |
-| Main Pact | `contractCall` | 只对 `ContributionPool` 执行受限调用，把已签 proof 写入链上，或在结算后代触发 `claimFor`。 |
+| Sign Pact | `messageSign` | 只约束 CAW 的签名权限，用于签署 Agent 生成的 EIP-712 typed data。高分 `ContributionProof` 或风险复核请求会在这里进入 Cobo App 审批。 |
+| Main Pact | `contractCall` | 只对 `ContributionPool` 执行受限调用，把签名后的 `ContributionProof` 写入链上，或在结算后代触发 `claimFor`。 |
 | Guard Pact | `transfer` | 演示 Cobo Policy 对超额 transfer 的真实拦截。 |
 
-Sign Pact 和 Main Pact 是故意分开的：Sign Pact 负责“评分 proof 能不能被签名”，Main Pact 负责“已签 proof 能不能被受限写链 / 代领”。两者不互相调用，而是由 Agent 编排成“评分审批 -> 签名证明 -> 链上记分 -> 按分结算”的流程。这样签名权和执行权分离，避免 AI Agent 变成无边界的资金分配脚本。
+Sign Pact 和 Main Pact 是故意分开的：Sign Pact 约束“CAW 是否可以对 Agent 生成的 typed data 执行 `messageSign`”，Main Pact 约束“签名后的 `ContributionProof` 是否可以被受限写链 / 代领”。两者不互相调用，而是由 Agent 编排成“评分 review -> 签名请求 / 必要时审批 -> 链上记分 -> 按分结算”的流程。这样签名权和执行权分离，避免 AI Agent 变成无边界的资金分配脚本。
 
 在 CGHub 中，Cobo 审批的核心含义是：审核 AI Agent 评分是否可以变成链上的资金分配权。
+
+结算阶段的 `claimFor` 也走 CAW Main Pact。这样贡献者不需要自己处理复杂交易或准备 gas，前端不接触 CAW 凭证，Agent 的代领权限被限制在 `ContributionPool` 的受限调用里，同时 Cobo 会留下执行记录，方便复盘整条结算链。
 
 ### 前端应用
 
 前端使用 Next.js 构建，按角色拆分主要入口：
 
 - 管理者工作台：活动创建、资金池状态、贡献审批、Cobo 状态。
-- 资金方 / 用户视图：活动资金池、注资入口、贡献与结算进度。
+- 用户 / 资金方 / 赞助方视图：活动资金池、付费或注资入口、贡献与结算进度。
 - 贡献者视图：贡献提交、评分结果、待领取金额和领取状态。
 - 复盘视图：Agent 决策、Cobo 审批、链上事件和资金流状态。
 
@@ -141,10 +156,10 @@ Sign Pact 和 Main Pact 是故意分开的：Sign Pact 负责“评分 proof 能
 
 | 模块 | 当前状态 |
 |------|----------|
-| 智能合约 | 已实现 `ContributionPool`，支持创建 Round、注资、记录贡献分、finalize 和 claim。 |
+| 智能合约 | 已实现 `ContributionPool`，支持创建 Round、资金进入、记录贡献分、finalize 和 `claim` / `claimFor`。 |
 | AI Agent 评分 | 已实现证据解析、rubric 评分、评分理由、风险标记和贡献审批记录。 |
 | Cobo 审批与执行 | 已接入 Cobo Agentic Wallet，支持 Pact 准备、message sign、审批同步、contract call 和状态展示。 |
-| 前端三角色 | 已实现管理者、资金方 / 用户、贡献者入口，以及活动、资金池、贡献、结算和复盘页面。 |
+| 前端三角色 | 已实现管理者、用户 / 资金方 / 赞助方、贡献者入口，以及活动、资金池、贡献、结算和复盘页面。 |
 | 活动 Registry | 已实现活动 / Round 的本地 Registry，用于管理活动元数据和前端展示状态。 |
 | Demo 配置 | 已提供 Sepolia demo 默认配置、`.env.example`、合约地址和本地启动流程。 |
 
