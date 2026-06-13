@@ -3,6 +3,9 @@
 面向 Hackathon、Grant、开源协作和社区活动的 AI 贡献结算系统。贡献者提交证据，Agent 按 rubric 评分，Cobo Agentic Wallet 对高风险动作审批与代执行，`ContributionPool` 按链上贡献分完成奖励结算。
 
 **一句话简介**：CGHub 用 Agent 评估贡献，用 Cobo 审批与执行关键动作，并用链上资金池按可验证贡献分自动分配奖励。
+## Demo Video
+
+demo链接：https://youtu.be/md2vfMMJlvo
 
 ## 项目简介
 
